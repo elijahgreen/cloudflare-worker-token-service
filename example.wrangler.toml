@@ -1,0 +1,7 @@
+name = "audiogata-oauth"
+main = "src/index.ts"
+compatibility_date = "2022-06-14"
+
+kv_namespaces = [
+  { binding = "TOKEN_URLS", id = "", preview_id = "" }
+]
