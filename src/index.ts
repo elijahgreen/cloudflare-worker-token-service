@@ -69,7 +69,15 @@ function getError(errorCode: number, errorMessage: string | null) {
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    if (request.method === "POST") {
+    if (request.method === "OPTIONS") {
+      return new Response(null, {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+        },
+      });
+    } else if (request.method === "POST") {
       const contentType = request.headers.get("content-type");
       if (contentType !== "application/x-www-form-urlencoded") {
         return getError(415, null);
