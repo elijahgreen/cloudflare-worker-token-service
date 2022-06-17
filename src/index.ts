@@ -1,11 +1,3 @@
-interface Variables {
-  [K: string]: string;
-}
-
-type Env = Variables & {
-  TOKEN_URLS: KVNamespace;
-};
-
 async function authorization(
   tokenUrl: string,
   clientId: string,
@@ -67,8 +59,53 @@ function getError(errorCode: number, errorMessage: string | null) {
   });
 }
 
+async function handleToken(url: URL, request: Request, env: Bindings) {
+  const body = await request.text();
+  const params = new URLSearchParams(body);
+  const clientId = params.get("client_id");
+  const grantType = params.get("grant_type");
+
+  if (!grantType) {
+    return getError(400, "'grant_type' not found");
+  }
+
+  if (!clientId) {
+    return getError(400, "'client_id' not found");
+  }
+  const tokenUrl = await env.TOKEN_URLS.get(clientId);
+  if (!tokenUrl) {
+    return getError(400, `'client_id' ${clientId} token url not found`);
+  }
+
+  const secret = env[clientId];
+  if (!secret) {
+    return getError(400, `'client_id' ${clientId} secret not found`);
+  }
+  if (grantType === "refresh_token") {
+    const refreshToken = params.get("refresh_token");
+    if (!refreshToken) {
+      return getError(400, `'refresh_token' not found`);
+    }
+
+    return refresh(tokenUrl, clientId, refreshToken, secret);
+  } else if (grantType === "authorization_code") {
+    const redirectUri = params.get("redirect_uri");
+    if (!redirectUri) {
+      return getError(400, `'redirect_uri' not found`);
+    }
+
+    const code = params.get("code");
+    if (!code) {
+      return getError(400, `'code' not found`);
+    }
+    return authorization(tokenUrl, clientId, code, redirectUri, secret);
+  } else {
+    return getError(400, `'grant_type' ${grantType} is invalid`);
+  }
+}
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Bindings): Promise<Response> {
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -78,56 +115,14 @@ export default {
         },
       });
     } else if (request.method === "POST") {
-      const contentType = request.headers.get("content-type");
-      if (contentType !== "application/x-www-form-urlencoded") {
-        return getError(415, null);
-      }
-
       const url = new URL(request.url);
-      const body = await request.text();
-      const params = new URLSearchParams(body);
-      const clientId = params.get("client_id");
-      const grantType = params.get("grant_type");
-
-      if (!grantType) {
-        return getError(400, "'grant_type' not found");
-      }
-
-      if (!clientId) {
-        return getError(400, "'client_id' not found");
-      }
-      const tokenUrl = await env.TOKEN_URLS.get(clientId);
-      if (!tokenUrl) {
-        return getError(400, `'client_id' ${clientId} tokenUrl not found`);
-      }
-
-      const secret = env[clientId];
-      if (!secret) {
-        return getError(400, `'client_id' ${clientId} secret not found`);
-      }
-
       if (url.pathname === "/token") {
-        if (grantType === "refresh_token") {
-          const refreshToken = params.get("refresh_token");
-          if (!refreshToken) {
-            return getError(400, `'refresh_token' not found`);
-          }
-
-          return refresh(tokenUrl, clientId, refreshToken, secret);
-        } else if (grantType === "authorization_code") {
-          const redirectUri = params.get("redirect_uri");
-          if (!redirectUri) {
-            return getError(400, `'redirect_uri' not found`);
-          }
-
-          const code = params.get("code");
-          if (!code) {
-            return getError(400, `'code' not found`);
-          }
-          return authorization(tokenUrl, clientId, code, redirectUri, secret);
-        } else {
-          return getError(400, `'grant_type' ${grantType} is invalid`);
+        const contentType = request.headers.get("content-type");
+        if (contentType !== "application/x-www-form-urlencoded") {
+          return getError(415, null);
         }
+
+        return handleToken(url, request, env);
       } else {
         return getError(404, null);
       }

@@ -1,17 +1,26 @@
 {
   "name": "cloudflare-worker-token-service",
   "version": "0.0.0",
+  "type": "module",
   "devDependencies": {
     "@cloudflare/workers-types": "^3.11.0",
+    "esbuild": "^0.14.44",
+    "jest": "^28.1.1",
+    "jest-environment-miniflare": "^2.5.0",
+    "miniflare": "^2.5.0",
+    "ts-jest": "^28.0.5",
     "typescript": "^4.7.3",
     "wrangler": "2.0.11"
   },
   "private": true,
   "scripts": {
     "start": "wrangler dev",
-    "deploy": "wrangler publish"
+    "deploy": "wrangler publish",
+    "build": "node build.js",
+    "test": "npm run build && node --experimental-vm-modules --no-warnings node_modules/jest/bin/jest.js"
   },
   "dependencies": {
+    "@types/jest": "^28.1.1",
     "itty-router": "^2.6.1"
   }
 }
