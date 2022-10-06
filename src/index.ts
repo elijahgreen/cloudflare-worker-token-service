@@ -106,6 +106,7 @@ async function handleToken(url: URL, request: Request, env: Bindings) {
 
 export default {
   async fetch(request: Request, env: Bindings): Promise<Response> {
+    const url = new URL(request.url);
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
@@ -115,7 +116,6 @@ export default {
         },
       });
     } else if (request.method === "POST") {
-      const url = new URL(request.url);
       if (url.pathname === "/token") {
         const contentType = request.headers.get("content-type");
         if (contentType !== "application/x-www-form-urlencoded") {
@@ -127,7 +127,15 @@ export default {
         return getError(404, null);
       }
     } else {
-      return new Response("Hello World!");
+      return new Response(
+        "cloudflare-worker-token-service\n\n" +
+          "Usage:\n" +
+          url.origin +
+          "/token",
+        {
+          status: 200,
+        }
+      );
     }
   },
 };
