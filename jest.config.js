@@ -17,5 +17,7 @@ export default {
     // explicitly mark it as an ES module.
     scriptPath: "dist/index.mjs",
     modules: true,
+    bindings: { 1234: "secret" },
+    kvNamespaces: ["TOKEN_URLS"],
   },
 };

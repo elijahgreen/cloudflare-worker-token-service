@@ -50,6 +50,29 @@ async function refresh(
   return newResponse;
 }
 
+async function clientCredentials(
+  tokenUrl: string,
+  clientId: string,
+  clientSecret: string
+) {
+  const params = new URLSearchParams();
+  params.append("grant_type", "client_credentials");
+  params.append("client_id", clientId);
+  params.append("client_secret", clientSecret);
+
+  const response = await fetch(tokenUrl, {
+    method: "POST",
+    body: params.toString(),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+  });
+
+  const newResponse = new Response(response.body, response);
+  newResponse.headers.set("Access-Control-Allow-Origin", "*");
+  return newResponse;
+}
+
 function getError(errorCode: number, errorMessage: string | null) {
   return new Response(errorMessage, {
     status: errorCode,
@@ -59,7 +82,7 @@ function getError(errorCode: number, errorMessage: string | null) {
   });
 }
 
-async function handleToken(url: URL, request: Request, env: Bindings) {
+async function handleToken(request: Request, env: Bindings): Promise<Response> {
   const body = await request.text();
   const params = new URLSearchParams(body);
   const clientId = params.get("client_id");
@@ -99,6 +122,8 @@ async function handleToken(url: URL, request: Request, env: Bindings) {
       return getError(400, `'code' not found`);
     }
     return authorization(tokenUrl, clientId, code, redirectUri, secret);
+  } else if (grantType === "client_credentials") {
+    return clientCredentials(tokenUrl, clientId, secret);
   } else {
     return getError(400, `'grant_type' ${grantType} is invalid`);
   }
@@ -122,7 +147,7 @@ export default {
           return getError(415, null);
         }
 
-        return handleToken(url, request, env);
+        return handleToken(request, env);
       } else {
         return getError(404, null);
       }

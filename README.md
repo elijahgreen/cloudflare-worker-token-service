@@ -23,3 +23,5 @@ url.searchParams.append("code", CODE);
 `refresh_token`
 
 `authorization_code`
+
+`client_credentials`
