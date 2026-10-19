@@ -163,4 +163,37 @@ describe("index.ts", () => {
     const body = await res.text();
     expect(body).toContain("grant_type");
   });
+  test("should give 429 when client_credentials is over its rate limit", async () => {
+    const ctx = createExecutionContext();
+    await env.TOKEN_URLS.put("1234", "http://example.org");
+    const keys: string[] = [];
+    const limitedEnv = {
+      ...env,
+      CLIENT_CREDENTIALS_LIMITER: {
+        limit: async ({ key }: RateLimitOptions) => {
+          keys.push(key);
+          return { success: false };
+        },
+      },
+    };
+    const params = getParams();
+    params.set("grant_type", "client_credentials");
+    const res = await worker.fetch(
+      new Request("http://localhost/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "CF-Connecting-IP": "203.0.113.7",
+        },
+        body: params.toString(),
+      }),
+      limitedEnv,
+      ctx
+    );
+    await waitOnExecutionContext(ctx);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("60");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(keys).toEqual(["1234:203.0.113.7"]);
+  });
 });

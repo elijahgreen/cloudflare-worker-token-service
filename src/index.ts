@@ -124,6 +124,18 @@ async function handleToken(request: Request, env: Bindings): Promise<Response> {
     }
     return authorization(tokenUrl, clientId, code, redirectUri, secret, basic);
   } else if (grantType === "client_credentials") {
+    // The only grant that needs nothing from a user, so anyone can mint app
+    // tokens with it and spend the app's quota at the provider. Limited per
+    // client and per caller, so one app's traffic can't use up another's.
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const { success } = await env.CLIENT_CREDENTIALS_LIMITER.limit({
+      key: `${clientId}:${ip}`,
+    });
+    if (!success) {
+      const response = getError(429, "Too many client_credentials requests");
+      response.headers.set("Retry-After", "60");
+      return response;
+    }
     return clientCredentials(tokenUrl, clientId, secret, basic);
   } else {
     return getError(400, `'grant_type' ${grantType} is invalid`);

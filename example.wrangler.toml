@@ -5,3 +5,10 @@ compatibility_date = "2022-06-14"
 kv_namespaces = [
   { binding = "TOKEN_URLS", id = "", preview_id = "" }
 ]
+
+# Per client id and caller IP on the client_credentials grant. Each app needs
+# about one app token per session, so this only bites mass minting.
+[[ratelimits]]
+name = "CLIENT_CREDENTIALS_LIMITER"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
