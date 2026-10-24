@@ -26,6 +26,6 @@ url.searchParams.append("code", CODE);
 
 `client_credentials`
 
-`client_credentials` is rate limited per client id and caller IP (10 a minute)
+`client_credentials` is rate limited per client id and caller IP (30 a minute)
 through the `CLIENT_CREDENTIALS_LIMITER` binding, since it is the one grant that
 needs nothing from a user. See `example.wrangler.toml`.

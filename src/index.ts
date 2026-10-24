@@ -1,3 +1,15 @@
+/**
+ * Reddit throttles generic and spoofed browser user agents and asks API
+ * clients for a descriptive one. Every other provider keeps the browser
+ * string it has always been sent.
+ */
+function userAgentFor(tokenUrl: string) {
+  if (new URL(tokenUrl).hostname.endsWith("reddit.com")) {
+    return "web:socialgata:1.0 (by /u/elijgreen)";
+  }
+  return "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.64 Safari/537.36";
+}
+
 async function makeRequest(
   tokenUrl: string,
   params: URLSearchParams,
@@ -6,10 +18,8 @@ async function makeRequest(
   basic: boolean
 ) {
   const headers = new Headers();
-  const userAgent =
-    "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.64 Safari/537.36";
   headers.set("Content-Type", "application/x-www-form-urlencoded");
-  headers.set("User-Agent", userAgent);
+  headers.set("User-Agent", userAgentFor(tokenUrl));
   if (basic) {
     const base64 = btoa(`${clientId}:${clientSecret}`);
     headers.set("Authorization", `Basic ${base64}`);
@@ -18,11 +28,21 @@ async function makeRequest(
     params.append("client_secret", clientSecret);
   }
 
-  const response = await fetch(tokenUrl, {
-    method: "POST",
-    body: params.toString(),
-    headers: headers,
-  });
+  const send = () =>
+    fetch(tokenUrl, {
+      method: "POST",
+      body: params.toString(),
+      headers: headers,
+    });
+  let response = await send();
+  // Reddit intermittently answers 429 with "Retry-After: 0" from Cloudflare's
+  // shared egress; asking again straight away usually gets a token.
+  if (
+    response.status === 429 &&
+    Number(response.headers.get("Retry-After") ?? 0) === 0
+  ) {
+    response = await send();
+  }
 
   const newResponse = new Response(response.body, response);
   newResponse.headers.set("Access-Control-Allow-Origin", "*");
@@ -132,8 +152,18 @@ async function handleToken(request: Request, env: Bindings): Promise<Response> {
       key: `${clientId}:${ip}`,
     });
     if (!success) {
+      // No IP: the client id and user agent are enough to tell a stuck app
+      // from a scraper.
+      console.warn({
+        event: "client_credentials_rate_limited",
+        clientId,
+        userAgent: request.headers.get("User-Agent"),
+        origin: request.headers.get("Origin"),
+      });
       const response = getError(429, "Too many client_credentials requests");
       response.headers.set("Retry-After", "60");
+      // Not CORS-safelisted, so a browser caller can't back off without this.
+      response.headers.set("Access-Control-Expose-Headers", "Retry-After");
       return response;
     }
     return clientCredentials(tokenUrl, clientId, secret, basic);

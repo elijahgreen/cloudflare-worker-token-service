@@ -193,6 +193,7 @@ describe("index.ts", () => {
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(429);
     expect(res.headers.get("Retry-After")).toBe("60");
+    expect(res.headers.get("Access-Control-Expose-Headers")).toBe("Retry-After");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(keys).toEqual(["1234:203.0.113.7"]);
   });
